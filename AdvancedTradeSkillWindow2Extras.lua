@@ -93,10 +93,18 @@ local GetTradeSkillReagentInfo = fetch_global('GetTradeSkillReagentInfo')
 local GetTradeSkillReagentItemLink = fetch_global('GetTradeSkillReagentItemLink')
 local GetCraftReagentInfo = fetch_global('GetCraftReagentInfo')
 local GetCraftReagentItemLink = fetch_global('GetCraftReagentItemLink')
+local GetSpellTabInfo = fetch_global('GetSpellTabInfo')
+local GetSpellTexture = fetch_global('GetSpellTexture')
+local GetSpellName = fetch_global('GetSpellName')
 local ATSW_GetProfessionTexture = fetch_global('ATSW_GetProfessionTexture')
 local ATSW_GetPositionFromGame = fetch_global('ATSW_GetPositionFromGame')
+local ATSW_SelectTab = fetch_global('ATSW_SelectTab')
+local BOOKTYPE_SPELL = fetch_global('BOOKTYPE_SPELL') or 'BOOKTYPE_SPELL'
+local ATSW_MAX_TRADESKILL_TABS = fetch_global('ATSW_MAX_TRADESKILL_TABS') or 0
 
 local BEAST_TRAINING_TEXTURE = 'Interface\\Icons\\Ability_Hunter_BeastCall02'
+local DISGUISE_TEXTURE = 'Interface\\Icons\\Ability_Rogue_Disguise'
+local DISGUISE_NAME = 'Disguise'
 local COST_LABEL_COLOR = '|cffFFd200'
 local WHITE_MONEY_COLOR = '|cffffffff'
 local GOLD_SUFFIX_COLOR = '|cffffd100'
@@ -145,6 +153,164 @@ local function current_profession()
     end
     local realmData = realmTable[realm]
     return realmData and realmData[player]
+end
+
+local function ensure_disguise_background()
+    local backgrounds = fetch_global('ATSW_Background')
+    if type(backgrounds) == 'table' and not backgrounds[DISGUISE_TEXTURE] then
+        backgrounds[DISGUISE_TEXTURE] = DISGUISE_NAME
+    end
+end
+
+ensure_disguise_background()
+
+local function normalized_string(value)
+    if type(value) == 'string' then
+        return string_lower(value)
+    end
+end
+
+local disguise_texture_key = normalized_string(DISGUISE_TEXTURE)
+
+local function get_disguise_spell_name()
+    if not (GetSpellTabInfo and GetSpellTexture and GetSpellName) then
+        return
+    end
+    local tabIndex = 1
+    while true do
+        local _, _, offset, numSpells = GetSpellTabInfo(tabIndex)
+        if not numSpells then
+            break
+        end
+        for slot = offset + 1, offset + numSpells do
+            local texture = GetSpellTexture(slot, BOOKTYPE_SPELL)
+            if texture and normalized_string(texture) == disguise_texture_key then
+                return GetSpellName(slot, BOOKTYPE_SPELL)
+            end
+        end
+        tabIndex = tabIndex + 1
+    end
+end
+
+local function player_knows_disguise()
+    return get_disguise_spell_name() ~= nil
+end
+
+local function names_match(a, b)
+    local left = normalized_string(a)
+    local right = normalized_string(b)
+    if not left or not right then
+        return left == right
+    end
+    return left == right
+end
+
+local function matches_disguise_profession(name)
+    if not name then
+        return
+    end
+    local disguiseSpellName = get_disguise_spell_name()
+    if disguiseSpellName then
+        if names_match(name, disguiseSpellName) then
+            return true
+        end
+    end
+    return names_match(name, DISGUISE_NAME)
+end
+
+local function get_tab(index)
+    return safe_getglobal('ATSWFrameTab' .. index)
+end
+
+local function get_tab_normal_texture(tab)
+    if tab and tab.GetNormalTexture then
+        return tab:GetNormalTexture()
+    end
+end
+
+local function get_tab_texture(tab)
+    local normal = get_tab_normal_texture(tab)
+    if normal and normal.GetTexture then
+        return normal:GetTexture()
+    end
+end
+
+local function find_tab_by_texture(texture)
+    local normalizedTexture = normalized_string(texture)
+    if not normalizedTexture then
+        return
+    end
+    for index = 1, ATSW_MAX_TRADESKILL_TABS do
+        local tab = get_tab(index)
+        if tab then
+            local tabTexture = get_tab_texture(tab)
+            if tabTexture and normalized_string(tabTexture) == normalizedTexture then
+                return tab
+            end
+        end
+    end
+end
+
+local function find_unused_tab()
+    for index = 1, ATSW_MAX_TRADESKILL_TABS do
+        local tab = get_tab(index)
+        if tab and not tab.Name and not get_tab_texture(tab) then
+            return tab
+        end
+    end
+end
+
+local function clear_tab(tab)
+    if not tab then
+        return
+    end
+    tab.Name = nil
+    local normal = get_tab_normal_texture(tab)
+    if normal and normal.SetTexture then
+        normal:SetTexture(nil)
+    else
+        tab:SetNormalTexture(nil)
+    end
+    if tab.Hide then
+        tab:Hide()
+    end
+end
+
+local function reselect_current_profession()
+    local profession = current_profession()
+    if profession and type(ATSW_SelectTab) == 'function' then
+        ATSW_SelectTab(profession)
+    end
+end
+
+local function ensure_disguise_tab(exception)
+    local disguiseName = get_disguise_spell_name()
+    if disguiseName and exception and names_match(disguiseName, exception) then
+        disguiseName = nil
+    end
+    local existingTab = find_tab_by_texture(DISGUISE_TEXTURE)
+    local changed
+    if disguiseName then
+        local tab = existingTab or find_unused_tab()
+        if tab then
+            if tab.SetNormalTexture then
+                tab:SetNormalTexture(DISGUISE_TEXTURE)
+            end
+            if tab.Show then
+                tab:Show()
+            end
+            if tab.Name ~= disguiseName then
+                tab.Name = disguiseName
+            end
+            changed = true
+        end
+    elseif existingTab then
+        clear_tab(existingTab)
+        changed = true
+    end
+    if changed then
+        reselect_current_profession()
+    end
 end
 
 local function is_beast_training()
@@ -470,3 +636,44 @@ local function hook_show_recipe()
 end
 
 hook_show_recipe()
+
+local function hook_atlas_skillups()
+    local original = fetch_global('ATSW_SkillUps')
+    if type(original) ~= 'function' then
+        return
+    end
+    rawset(_G, 'ATSW_SkillUps', function(name)
+        local ok, a, b, c, d = pcall(original, name)
+        if ok then
+            return a, b, c, d
+        end
+    end)
+end
+
+local function hook_configure_skill_buttons()
+    local original = fetch_global('ATSW_ConfigureSkillButtons')
+    if type(original) ~= 'function' then
+        return
+    end
+    rawset(_G, 'ATSW_ConfigureSkillButtons', function(exception)
+        original(exception)
+        ensure_disguise_tab(exception)
+    end)
+end
+
+local function hook_profession_exists()
+    local original = fetch_global('ATSW_ProfessionExists')
+    if type(original) ~= 'function' then
+        return
+    end
+    rawset(_G, 'ATSW_ProfessionExists', function(profession)
+        if matches_disguise_profession(profession) then
+            return player_knows_disguise()
+        end
+        return original(profession)
+    end)
+end
+
+hook_atlas_skillups()
+hook_configure_skill_buttons()
+hook_profession_exists()
