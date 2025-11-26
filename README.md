@@ -1,3 +1,8 @@
+## This fork adds the following features:
+* Support for TurtleWoW's Rogue Disguise "tradeskill/profession".
+* Adds a "total cost" estimate which uses Aux price info to calculate it's cost. (requires Aux)
+* Adds the ability to easily search for all materials in a recipe, as well as the finished craft. This is done by right-clicking on any recipe in the ATSW2 recipe list. (requires Aux)
+
 # Advanced Trade Skill Window 2
 Improved window for your professions for World of Warcraft vanilla
 
