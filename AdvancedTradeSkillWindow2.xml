@@ -1,4 +1,4 @@
-﻿<Ui>
+<Ui>
 	<Button name="ATSWRecipeButtonTemplate" hidden="true" virtual="true">
 		<Layers>
 			<Layer level="BACKGROUND">
@@ -875,7 +875,7 @@
 						</Anchor>
 					</Anchors>
 				</FontString>
-				<FontString name="ATSWCostText" inherits="CostFont" hidden="true">
+				<FontString name="ATSWCostText" inherits="ATSWYellowFont" hidden="true">
 					<Anchors>
 						<Anchor point="LEFT" relativeTo="ATSWReagentsLabel" relativePoint="RIGHT">
 							<Offset x="" y="-0.5"/>
