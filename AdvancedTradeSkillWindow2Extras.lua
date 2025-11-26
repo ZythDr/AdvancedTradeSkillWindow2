@@ -36,6 +36,9 @@ local string_lib = _G.string or {}
 local string_lower = string_lib.lower or function(text)
     return text
 end
+local string_match = string_lib.match or function()
+    return
+end
 local math_lib = _G.math or {}
 local math_floor = math_lib.floor or function(value)
     return value or 0
@@ -116,35 +119,63 @@ local COPPER_PER_GOLD = 10000
 local COPPER_PER_SILVER = 100
 
 local vendor_defaults = {
-    [2320] = true,
-    [2321] = true,
-    [4291] = true,
-    [8343] = true,
-    [14341] = true,
-    [3371] = true,
-    [3372] = true,
-    [8925] = true,
-    [18256] = true,
-    [2324] = true,
-    [2604] = true,
-    [2605] = true,
-    [4340] = true,
-    [4341] = true,
-    [4342] = true,
-    [6260] = true,
-    [6261] = true,
-    [2880] = true,
-    [3466] = true,
+    [2320] = 'Coarse Thread',
+    [2321] = 'Fine Thread',
+    [4291] = 'Silken Thread',
+    [8343] = 'Heavy Silken Thread',
+    [14341] = 'Rune Thread',
+    [3371] = 'Empty Vial',
+    [3372] = 'Leaded Vial',
+    [8925] = 'Crystal Vial',
+    [18256] = 'Imbued Vial',
+    [2324] = 'Bleach',
+    [2604] = 'Red Dye',
+    [2605] = 'Green Dye',
+    [4340] = 'Gray Dye',
+    [4341] = 'Yellow Dye',
+    [4342] = 'Purple Dye',
+    [6260] = 'Blue Dye',
+    [6261] = 'Orange Dye',
+    [2880] = 'Weak Flux',
+    [3466] = 'Strong Flux',
+    [159] = 'Refreshing Spring Water',
+    [1179] = 'Ice Cold Milk',
+    [1205] = 'Melon Juice',
+    [1645] = 'Moonberry Juice',
+    [1708] = 'Sweet Nectar',
+    [2596] = 'Dwarven Mild',
+    [2678] = 'Mild Spices',
+    [2692] = 'Hot Spices',
+    [3713] = 'Soothing Spices',
 }
 
+local vendor_only_reagent_names = {}
 local vendor_only_reagents = fetch_global('ATSW_VENDOR_ONLY_REAGENTS')
 if type(vendor_only_reagents) ~= 'table' then
     vendor_only_reagents = {}
 end
-for itemID in pairs(vendor_defaults) do
+for itemID, label in pairs(vendor_defaults) do
     vendor_only_reagents[itemID] = true
+    if type(label) == 'string' then
+        local normalized = string_lower(label)
+        if normalized then
+            vendor_only_reagent_names[normalized] = true
+        end
+    end
 end
 rawset(_G, 'ATSW_VENDOR_ONLY_REAGENTS', vendor_only_reagents)
+
+local function is_vendor_only_reagent(itemID, name)
+    if itemID and vendor_only_reagents[itemID] then
+        return true
+    end
+    if name then
+        local normalized = string_lower(name)
+        if normalized and vendor_only_reagent_names[normalized] then
+            return true
+        end
+    end
+end
 
 local function current_profession()
     local realmTable = fetch_global('ATSW_Profession')
@@ -372,6 +403,16 @@ local function get_reagent_info(index, reagentIndex)
     return name, texture, amount, playerAmount, link
 end
 
+local function parse_item_id(link)
+    if type(link) ~= 'string' then
+        return
+    end
+    local id = string_match(link, 'item:(%d+)')
+    if id then
+        return tonumber(id)
+    end
+end
+
 local function add_filter_name(source, filters, seen)
     if not source then
         return
@@ -417,8 +458,11 @@ local function build_aux_reagent_filter(button)
     local seen = {}
     add_filter_name(button.Name, filters, seen)
     for reagentIndex = 1, reagentCount do
-        local name = get_reagent_info(index, reagentIndex)
-        add_filter_name(name, filters, seen)
+        local name, _, _, _, link = get_reagent_info(index, reagentIndex)
+        local itemID = parse_item_id(link)
+        if not is_vendor_only_reagent(itemID, name) then
+            add_filter_name(name, filters, seen)
+        end
     end
     if filters[1] then
         return join(filters, '; ')
