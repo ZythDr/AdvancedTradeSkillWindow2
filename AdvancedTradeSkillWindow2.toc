@@ -12,6 +12,6 @@
 Localization.lua
 AdvancedTradeSkillWindow2.lua
 AdvancedTradeSkillWindow2.xml
-AdvancedTradeSkillWindow2.lua
+AdvancedTradeSkillWindow2Extras.lua
 CustomSorting.lua
 CustomSorting.xml
