@@ -96,9 +96,11 @@ local GetCraftReagentItemLink = fetch_global('GetCraftReagentItemLink')
 local GetSpellTabInfo = fetch_global('GetSpellTabInfo')
 local GetSpellTexture = fetch_global('GetSpellTexture')
 local GetSpellName = fetch_global('GetSpellName')
+local GetNumSpellTabs = fetch_global('GetNumSpellTabs')
 local ATSW_GetProfessionTexture = fetch_global('ATSW_GetProfessionTexture')
 local ATSW_GetPositionFromGame = fetch_global('ATSW_GetPositionFromGame')
 local ATSW_SelectTab = fetch_global('ATSW_SelectTab')
+local CreateFrame = fetch_global('CreateFrame')
 local BOOKTYPE_SPELL = fetch_global('BOOKTYPE_SPELL') or 'BOOKTYPE_SPELL'
 local ATSW_MAX_TRADESKILL_TABS = fetch_global('ATSW_MAX_TRADESKILL_TABS') or 0
 
@@ -172,20 +174,29 @@ end
 
 local disguise_texture_key = normalized_string(DISGUISE_TEXTURE)
 
+local cached_disguise_name
+local cached_disguise_checked
+
 local function get_disguise_spell_name()
+    if cached_disguise_checked then
+        return cached_disguise_name
+    end
+    cached_disguise_checked = true
     if not (GetSpellTabInfo and GetSpellTexture and GetSpellName) then
         return
     end
+    local maxTabs = (GetNumSpellTabs and GetNumSpellTabs()) or 12
     local tabIndex = 1
-    while true do
+    while tabIndex <= maxTabs do
         local _, _, offset, numSpells = GetSpellTabInfo(tabIndex)
         if not numSpells then
             break
         end
-        for slot = offset + 1, offset + numSpells do
+        for slot = (offset or 0) + 1, (offset or 0) + numSpells do
             local texture = GetSpellTexture(slot, BOOKTYPE_SPELL)
             if texture and normalized_string(texture) == disguise_texture_key then
-                return GetSpellName(slot, BOOKTYPE_SPELL)
+                cached_disguise_name = GetSpellName(slot, BOOKTYPE_SPELL)
+                return cached_disguise_name
             end
         end
         tabIndex = tabIndex + 1
@@ -209,13 +220,24 @@ local function matches_disguise_profession(name)
     if not name then
         return
     end
+    if names_match(name, DISGUISE_NAME) then
+        return true
+    end
     local disguiseSpellName = get_disguise_spell_name()
     if disguiseSpellName then
-        if names_match(name, disguiseSpellName) then
-            return true
-        end
+        return names_match(name, disguiseSpellName)
     end
-    return names_match(name, DISGUISE_NAME)
+end
+
+if type(CreateFrame) == 'function' then
+    local disguise_event_frame = CreateFrame('Frame')
+    if disguise_event_frame and disguise_event_frame.RegisterEvent and disguise_event_frame.SetScript then
+        disguise_event_frame:RegisterEvent('SPELLS_CHANGED')
+        disguise_event_frame:SetScript('OnEvent', function()
+            cached_disguise_checked = nil
+            cached_disguise_name = nil
+        end)
+    end
 end
 
 local function get_tab(index)
