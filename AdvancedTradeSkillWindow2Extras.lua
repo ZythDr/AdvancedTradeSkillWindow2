@@ -216,21 +216,17 @@ local function get_disguise_spell_name()
     if not (GetSpellTabInfo and GetSpellTexture and GetSpellName) then
         return
     end
-    local maxTabs = (GetNumSpellTabs and GetNumSpellTabs()) or 12
-    local tabIndex = 1
-    while tabIndex <= maxTabs do
-        local _, _, offset, numSpells = GetSpellTabInfo(tabIndex)
-        if not numSpells then
-            break
+    -- Only check the first/general tab to avoid picking up toys or other custom tabs.
+    local _, _, offset, numSpells = GetSpellTabInfo(1)
+    if not numSpells then
+        return
+    end
+    for slot = (offset or 0) + 1, (offset or 0) + numSpells do
+        local texture = GetSpellTexture(slot, BOOKTYPE_SPELL)
+        if texture and normalized_string(texture) == disguise_texture_key then
+            cached_disguise_name = GetSpellName(slot, BOOKTYPE_SPELL)
+            return cached_disguise_name
         end
-        for slot = (offset or 0) + 1, (offset or 0) + numSpells do
-            local texture = GetSpellTexture(slot, BOOKTYPE_SPELL)
-            if texture and normalized_string(texture) == disguise_texture_key then
-                cached_disguise_name = GetSpellName(slot, BOOKTYPE_SPELL)
-                return cached_disguise_name
-            end
-        end
-        tabIndex = tabIndex + 1
     end
 end
 
