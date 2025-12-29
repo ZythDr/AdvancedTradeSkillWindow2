@@ -1117,6 +1117,61 @@ end
 
 hook_show_recipe()
 
+local function hide_recipe_tooltips()
+    local recipeTooltip = fetch_global('ATSWRecipeTooltip')
+    if recipeTooltip and recipeTooltip.Hide then
+        recipeTooltip:Hide()
+    end
+    local itemTooltip = fetch_global('ATSWRecipeItemTooltip')
+    if itemTooltip and itemTooltip.Hide then
+        itemTooltip:Hide()
+    end
+    local gameTooltip = fetch_global('GameTooltip')
+    if gameTooltip and gameTooltip.Hide then
+        gameTooltip:Hide()
+    end
+end
+
+local function hook_close_functions()
+    local function wrap(name)
+        local original = fetch_global(name)
+        if type(original) ~= 'function' then
+            return
+        end
+        rawset(_G, name, function(...)
+            hide_recipe_tooltips()
+            return original(...)
+        end)
+    end
+    wrap('ATSW_Hide')
+    wrap('CloseATSW')
+end
+
+local function install_tooltip_watchdog()
+    if type(CreateFrame) ~= 'function' then
+        return
+    end
+    local watchdog = CreateFrame('Frame')
+    if not watchdog or not watchdog.SetScript then
+        return
+    end
+    local elapsed = 0
+    watchdog:SetScript('OnUpdate', function(_, delta)
+        elapsed = elapsed + (delta or 0)
+        if elapsed < 0.5 then
+            return
+        end
+        elapsed = 0
+        local atswFrame = fetch_global('ATSWFrame')
+        if atswFrame and atswFrame.IsShown and not atswFrame:IsShown() then
+            hide_recipe_tooltips()
+        end
+    end)
+end
+
+hook_close_functions()
+install_tooltip_watchdog()
+
 local function hook_atlas_skillups()
     local original = fetch_global('ATSW_SkillUps')
     if type(original) ~= 'function' then
