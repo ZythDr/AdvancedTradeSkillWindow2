@@ -1138,9 +1138,9 @@ local function hook_close_functions()
         if type(original) ~= 'function' then
             return
         end
-        rawset(_G, name, function(...)
+        rawset(_G, name, function()
             hide_recipe_tooltips()
-            return original(...)
+            return original()
         end)
     end
     wrap('ATSW_Hide')
