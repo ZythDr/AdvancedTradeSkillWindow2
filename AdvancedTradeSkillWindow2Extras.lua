@@ -23,6 +23,13 @@ if type(extras_table) ~= 'table' then
     rawset(_G, 'ATSW_Extras', extras_table)
 end
 
+-- Persistent registry to mark which globals we've wrapped to avoid repeated wrapping across reloads
+local wrapped_registry = fetch_global('__ATSW_wrapped_registry')
+if type(wrapped_registry) ~= 'table' then
+    wrapped_registry = {}
+    rawset(_G, '__ATSW_wrapped_registry', wrapped_registry)
+end
+
 local function safe_getglobal(name)
     local getter = fetch_global('getglobal')
     if type(getter) == 'function' then
@@ -580,7 +587,8 @@ end
 
 local function hook_recipe_button_click()
     local original = fetch_global('ATSWRecipeButton_OnClick')
-    if type(original) ~= 'function' then
+    -- use persistent registry to avoid wrapping across reloads
+    if type(original) ~= 'function' or wrapped_registry['ATSWRecipeButton_OnClick'] then
         return
     end
     local function handler(button)
@@ -589,6 +597,8 @@ local function hook_recipe_button_click()
         end
         return original(button)
     end
+    -- Preserve original by replacing only once; placement in registry prevents re-wrapping
+    wrapped_registry['ATSWRecipeButton_OnClick'] = true
     rawset(_G, 'ATSWRecipeButton_OnClick', handler)
 end
 
@@ -1103,16 +1113,24 @@ local function hook_show_recipe()
         end
     end
 
-    rawset(_G, 'ATSW_ShowRecipeTooltip', ATSW_ShowRecipeTooltip_WithPrices)
-    local function handler(name)
-        local results = { original(name) }
-        update_aux_cost_label(name)
-        if unpack then
-            return unpack(results)
-        end
-        return results[1]
+    -- Install/use wrapper only if not already wrapped (use registry)
+    if not wrapped_registry['ATSW_ShowRecipeTooltip'] then
+        wrapped_registry['ATSW_ShowRecipeTooltip'] = true
+        rawset(_G, 'ATSW_ShowRecipeTooltip', ATSW_ShowRecipeTooltip_WithPrices)
     end
-    rawset(_G, 'ATSW_ShowRecipe', handler)
+
+    if type(original) == 'function' and not wrapped_registry['ATSW_ShowRecipe'] then
+        local function handler(name)
+            local results = { original(name) }
+            update_aux_cost_label(name)
+            if unpack then
+                return unpack(results)
+            end
+            return results[1]
+        end
+        wrapped_registry['ATSW_ShowRecipe'] = true
+        rawset(_G, 'ATSW_ShowRecipe', handler)
+    end
 end
 
 hook_show_recipe()
@@ -1135,13 +1153,15 @@ end
 local function hook_close_functions()
     local function wrap(name)
         local original = fetch_global(name)
-        if type(original) ~= 'function' then
+        if type(original) ~= 'function' or wrapped_registry[name] then
             return
         end
-        rawset(_G, name, function()
+        local function wrapped()
             hide_recipe_tooltips()
             return original()
-        end)
+        end
+        wrapped_registry[name] = true
+        rawset(_G, name, wrapped)
     end
     wrap('ATSW_Hide')
     wrap('CloseATSW')
@@ -1174,39 +1194,45 @@ install_tooltip_watchdog()
 
 local function hook_atlas_skillups()
     local original = fetch_global('ATSW_SkillUps')
-    if type(original) ~= 'function' then
+    if type(original) ~= 'function' or wrapped_registry['ATSW_SkillUps'] then
         return
     end
-    rawset(_G, 'ATSW_SkillUps', function(name)
+    local function wrapped(name)
         local ok, a, b, c, d = pcall(original, name)
         if ok then
             return a, b, c, d
         end
-    end)
+    end
+    wrapped_registry['ATSW_SkillUps'] = true
+    rawset(_G, 'ATSW_SkillUps', wrapped)
 end
 
 local function hook_configure_skill_buttons()
     local original = fetch_global('ATSW_ConfigureSkillButtons')
-    if type(original) ~= 'function' then
+    if type(original) ~= 'function' or wrapped_registry['ATSW_ConfigureSkillButtons'] then
         return
     end
-    rawset(_G, 'ATSW_ConfigureSkillButtons', function(exception)
+    local function wrapped(exception)
         original(exception)
         ensure_disguise_tab(exception)
-    end)
+    end
+    wrapped_registry['ATSW_ConfigureSkillButtons'] = true
+    rawset(_G, 'ATSW_ConfigureSkillButtons', wrapped)
 end
 
 local function hook_profession_exists()
     local original = fetch_global('ATSW_ProfessionExists')
-    if type(original) ~= 'function' then
+    if type(original) ~= 'function' or wrapped_registry['ATSW_ProfessionExists'] then
         return
     end
-    rawset(_G, 'ATSW_ProfessionExists', function(profession)
+    local function wrapped(profession)
         if matches_disguise_profession(profession) then
             return player_knows_disguise()
         end
         return original(profession)
-    end)
+    end
+    wrapped_registry['ATSW_ProfessionExists'] = true
+    rawset(_G, 'ATSW_ProfessionExists', wrapped)
 end
 
 hook_atlas_skillups()
