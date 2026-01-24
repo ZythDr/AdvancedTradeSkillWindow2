@@ -203,7 +203,8 @@ end
 local function ensure_disguise_background()
     local backgrounds = fetch_global('ATSW_Background')
     if type(backgrounds) == 'table' and not backgrounds[DISGUISE_TEXTURE] then
-        backgrounds[DISGUISE_TEXTURE] = DISGUISE_NAME
+        -- No native background for Disguise; fall back to Poisons background which suits rogue theme
+        backgrounds[DISGUISE_TEXTURE] = 'Poisons'
     end
 end
 
@@ -849,7 +850,7 @@ local function hook_show_recipe()
         return
     end
 
-    -- Hook ATSW_ShowRecipeTooltip to add price column without changing any other formatting
+    -- Hook ATSW_ShowRecipeTooltip to append a single Total Cost line (no layout changes)
     local original_ATSW_ShowRecipeTooltip = fetch_global('ATSW_ShowRecipeTooltip')
 
     local function ATSW_ShowRecipeTooltip_WithPrices()
@@ -880,234 +881,18 @@ local function hook_show_recipe()
             return
         end
 
-        -- Store original AddDoubleLine method
-        local original_AddDoubleLine = Tooltip.AddDoubleLine
-        local original_SetWidth = Tooltip.SetWidth
-        local totalCost = 0
-        local headerModified = false
-
-        -- Reserve space on the right for the Est. Price column.
-        -- This prevents the Bags/Bank/Alts text from shifting with price width.
-        local PRICE_COLUMN_OFFSET_PX = 80
-        local PRICE_RIGHT_MARGIN_PX = 10
-        local PRICE_COLUMN_WIDTH_PX = PRICE_COLUMN_OFFSET_PX - 20
-
-        local tooltipName = (Tooltip.GetName and Tooltip:GetName()) or 'ATSWRecipeTooltip'
-
-        local function escape_lua_pattern(text)
-            if type(text) ~= 'string' then
-                return ''
-            end
-            return (string.gsub(text, '([%(%)%.%%%+%-%*%?%[%]%^%$])', '%%%1'))
-        end
-
-        -- Clear any old overlay price lines from previous tooltips.
-        for i = 1, 40 do
-            local fs = _G[tooltipName .. 'ExtrasPriceRight' .. i]
-            if fs then
-                fs:SetText('')
-                fs:Hide()
-            end
-        end
-
-        local function get_price_fontstring(lineIndex, isHeader)
-            local fsName = tooltipName .. 'ExtrasPriceRight' .. lineIndex
-            local fs = _G[fsName]
-            if not fs then
-                fs = Tooltip:CreateFontString(fsName, 'ARTWORK', isHeader and 'GameTooltipHeaderText' or 'GameTooltipText')
-            end
-            if isHeader then
-                local headerFont = fetch_global('GameTooltipHeaderText')
-                if headerFont and headerFont.GetFont then
-                    local font, size, flags = headerFont:GetFont()
-                    if font and size then
-                        fs:SetFont(font, size, flags)
-                    end
-                end
-                fs:SetTextColor(1, 0.82, 0) -- Ensure gold/yellow header color even when reusing fontstrings
-            end
-            fs:SetJustifyH('RIGHT')
-            fs:SetWidth(PRICE_COLUMN_WIDTH_PX)
-            fs:ClearAllPoints()
-            local leftFS = _G[tooltipName .. 'TextLeft' .. lineIndex]
-            if leftFS then
-                fs:SetPoint('TOP', leftFS, 'TOP')
-            else
-                fs:SetPoint('TOPLEFT', Tooltip, 'TOPLEFT', 10, -10)
-            end
-            fs:SetPoint('RIGHT', Tooltip, 'RIGHT', -PRICE_RIGHT_MARGIN_PX, 0)
-            return fs
-        end
-
-        -- Widen the tooltip so the overlay column has room.
-        if original_SetWidth then
-            Tooltip.SetWidth = function(self, width)
-                return original_SetWidth(self, (width or 0) + PRICE_COLUMN_OFFSET_PX)
-            end
-        end
-
-        -- Get aux dependencies once for this tooltip
-        local history, info = ATSW_GetAuxCostDependencies()
-
-        -- Pad string to minimum width with leading spaces
-        local function pad_price(text, minWidth)
-            if not text then
-                text = ''
-            end
-            -- Strip color codes to get actual display length
-            local stripped = string.gsub(text, '|c%x%x%x%x%x%x%x%x', '')
-            stripped = string.gsub(stripped, '|r', '')
-            local displayLen = string.len(stripped)
-            local padding = (minWidth or 18) - displayLen
-            if padding > 0 then
-                return string.rep(' ', padding) .. text
-            end
-            return text
-        end
-
-        -- Look up price for an item by name
-        local function lookup_price_by_name(itemName, amount)
-            if not (itemName and history and info and info.item_id) then
-                return nil, nil
-            end
-            amount = amount or 1
-            
-            -- Get item ID from name
-            local itemID = info.item_id(itemName)
-            if not itemID then
-                return nil, nil
-            end
-            
-            -- Check if buyable from vendor
-            local ATSW_IsInMerchant = fetch_global('ATSW_IsInMerchant')
-            local isBuyable = vendor_only_reagents[itemID] or (ATSW_IsInMerchant and ATSW_IsInMerchant(itemName))
-            
-            local unitValue
-            if isBuyable then
-                unitValue = ATSW_GetVendorUnitPrice(info, itemID, nil)
-            else
-                unitValue = ATSW_GetAuctionUnitPrice(history, itemID, 0)
-            end
-            
-            if unitValue and unitValue > 0 then
-                local total = unitValue * amount
-                return ATSW_ColorizedMoneyStringShort(total), total
-            end
-            return nil, nil
-        end
-
-        -- Extract item name and amount from tooltip left text
-        local function parse_tooltip_item(leftText)
-            if not leftText then
-                return nil, 1
-            end
-            local itemName = leftText
-            local amount = 1
-            
-            -- Strip color codes
-            itemName = string.gsub(itemName, '|c%x%x%x%x%x%x%x%x', '')
-            itemName = string.gsub(itemName, '|r', '')
-            
-            -- Extract amount if present - look for (number) pattern
-            local foundAmount = string.match(itemName, '%s*%((%d+)%)')
-            if foundAmount then
-                amount = tonumber(foundAmount) or 1
-                itemName = string.gsub(itemName, '%s*%(%d+%)', '')
-            end
-
-            -- Remove (buyable) / localized buyable label
-            local buyableLabel = fetch_global('ATSW_TOOLTIP_BUYABLE')
-            if type(buyableLabel) == 'string' and buyableLabel ~= '' then
-                local buyablePattern = escape_lua_pattern(buyableLabel)
-                if buyablePattern ~= '' then
-                    itemName = string.gsub(itemName, '%s*' .. buyablePattern, '')
-                end
-            end
-            -- Also remove a plain English fallback if present
-            itemName = string.gsub(itemName, '%s*%(buyable%)', '')
-            
-            -- Trim trailing whitespace
-            itemName = string.gsub(itemName, '%s+$', '')
-            
-            if itemName and itemName ~= '' then
-                return itemName, amount
-            end
-            return nil, 1
-        end
-
-        -- Temporarily hook AddDoubleLine:
-        -- 1) Keep the original rightText intact (Bags/Bank/Alts)
-        -- 2) Re-anchor the original right column 200px to the left
-        -- 3) Draw an overlay "Est. Price" column anchored to the real right edge
-        Tooltip.AddDoubleLine = function(self, texture, leftText, rightText, r, g, b)
-            local before = self.NumLines or 0
-            local ret = original_AddDoubleLine(self, texture, leftText, rightText, r, g, b)
-            local lineIndex = self.NumLines or before
-
-            local ATSW_TOOLTIP_INBAGS = fetch_global('ATSW_TOOLTIP_INBAGS') or 'Bags'
-            local isReagentHeader = (rightText and string.find(rightText, ATSW_TOOLTIP_INBAGS))
-            local isReagentLine = (headerModified and texture)
-
-            if isReagentHeader and not headerModified then
-                headerModified = true
-                local leftFS = _G[tooltipName .. 'TextLeft' .. lineIndex]
-                local rightFS = _G[tooltipName .. 'TextRight' .. lineIndex]
-                if leftFS and rightFS then
-                    rightFS:ClearAllPoints()
-                    rightFS:SetPoint('TOP', leftFS, 'TOP')
-                    rightFS:SetPoint('RIGHT', Tooltip, 'RIGHT', -(PRICE_RIGHT_MARGIN_PX + PRICE_COLUMN_OFFSET_PX), 0)
-                end
-
-                local priceHeaderFS = get_price_fontstring(lineIndex, true)
-                priceHeaderFS:SetText('Est. Price')
-                -- Copy font from native header to match exactly
-                if rightFS then
-                    local font, size = rightFS:GetFont()
-                    priceHeaderFS:SetFont(font, size)
-                end
-                priceHeaderFS:Show()
-            elseif isReagentLine then
-                local leftFS = _G[tooltipName .. 'TextLeft' .. lineIndex]
-                local rightFS = _G[tooltipName .. 'TextRight' .. lineIndex]
-                if leftFS and rightFS then
-                    rightFS:ClearAllPoints()
-                    rightFS:SetPoint('TOP', leftFS, 'TOP')
-                    rightFS:SetPoint('RIGHT', Tooltip, 'RIGHT', -(PRICE_RIGHT_MARGIN_PX + PRICE_COLUMN_OFFSET_PX), 0)
-                end
-
-                local itemName, amount = parse_tooltip_item(leftText)
-                local costText, costValue = lookup_price_by_name(itemName, amount)
-                if costValue then
-                    totalCost = totalCost + costValue
-                end
-                local priceFS = get_price_fontstring(lineIndex, false)
-                priceFS:SetText(costText or '')
-                priceFS:Show()
-            end
-
-            return ret
-        end
-
-        -- Run the original tooltip function with our hooked AddDoubleLine
+        -- Render the tooltip using the original ATSW tooltip generator.
         if original_ATSW_ShowRecipeTooltip then
             original_ATSW_ShowRecipeTooltip()
         end
 
-        -- Restore original AddDoubleLine
-        Tooltip.AddDoubleLine = original_AddDoubleLine
-
-        -- Restore original SetWidth
-        Tooltip.SetWidth = original_SetWidth
-
-        -- Add total cost line at bottom if we have cost data
-        if totalCost > 0 then
-            local totalFormatted = ATSW_ColorizedMoneyStringShort(totalCost)
-            if totalFormatted then
-                local totalLabel = (COST_LABEL_COLOR or '|cffFFd200') .. '(Total Cost: ' .. totalFormatted .. ')' .. (FONT_COLOR_CODE_CLOSE or '|r')
-                Tooltip:AddTextLine(' ')
-                Tooltip:AddTextLine(totalLabel, 11)
-                -- Adjust tooltip height for the new lines
-                local LINE_HEIGHT = 18
+        -- Append only a single Total Cost line at the bottom of the tooltip (no other modifications)
+        local totalLabel = ATSW_GetAuxTotalCostLabelForRecipe(button.Name, ATSW_ColorizedMoneyStringShort)
+        if totalLabel then
+            Tooltip:AddTextLine(' ')
+            Tooltip:AddTextLine(totalLabel, 11)
+            local LINE_HEIGHT = 18
+            if Tooltip.GetHeight then
                 Tooltip:SetHeight(Tooltip:GetHeight() + LINE_HEIGHT * 2)
             end
         end
@@ -1134,6 +919,65 @@ local function hook_show_recipe()
 end
 
 hook_show_recipe()
+
+-- Safety wrapper: avoid nil concatenation in ATSW_GetAltsLocationIntoTooltip
+-- Some UI entry points call this and expect this:GetParent().Link to exist; protect against nil.
+local function ensure_alts_tooltip_safe()
+    local original = fetch_global('ATSW_GetAltsLocationIntoTooltip')
+    if type(original) ~= 'function' or wrapped_registry['ATSW_GetAltsLocationIntoTooltip'] then
+        return
+    end
+    local function safe_GetAltsLocationIntoTooltip(Name)
+        local Tooltip = fetch_global('ATSWRecipeTooltip')
+        if not Tooltip then
+            return original(Name)
+        end
+
+        local HeaderAdded = false
+        local function GetLocationSafe(Table, In)
+            if not (Name and Table) then return end
+            for RName, realmTable in pairs(Table) do
+                if RName == realm then
+                    for PName, _ in pairs(realmTable or {}) do
+                        if PName ~= player then
+                            local Amount = 0
+                            if Table == ATSW_Bags then
+                                Amount = Amount + (GetAltsAmountInBags and GetAltsAmountInBags(Name, PName) or 0)
+                            elseif Table == ATSW_Bank then
+                                Amount = Amount + (GetAltsAmountInBank and GetAltsAmountInBank(Name, PName) or 0)
+                            end
+
+                            if Amount > 0 then
+                                if not HeaderAdded then
+                                    local parent = safe_getglobal('this') and (safe_getglobal('this').GetParent and safe_getglobal('this'):GetParent())
+                                    local link = parent and parent.Link or Name or ''
+                                    Tooltip:AddTextLine((fetch_global('ATSW_TOOLTIP_POSSESS') or '') .. ' ' .. link .. ':')
+                                    HeaderAdded = true
+                                end
+                                Tooltip:AddTextLine((ClassColorize and ClassColorize(PName) or PName) .. ': ' .. '|cffffffff' .. Amount .. '|r ' .. (In or ''))
+                            end
+                        end
+                    end
+                end
+            end
+        end
+
+        Tooltip:ClearLines()
+        Tooltip:SetOwner(safe_getglobal('this') or UIParent, 'ANCHOR_BOTTOMRIGHT', 0)
+
+        GetLocationSafe(ATSW_Bags, ATSW_ALTLIST1)
+        GetLocationSafe(ATSW_Bank, ATSW_ALTLIST2)
+
+        Tooltip:Show()
+        Tooltip:SetWidth(Tooltip.MaxLineWidth)
+        Tooltip:SetHeight(18 + Tooltip.NumLines * 16)
+    end
+
+    wrapped_registry['ATSW_GetAltsLocationIntoTooltip'] = true
+    rawset(_G, 'ATSW_GetAltsLocationIntoTooltip', safe_GetAltsLocationIntoTooltip)
+end
+
+ensure_alts_tooltip_safe()
 
 local function hide_recipe_tooltips()
     local recipeTooltip = fetch_global('ATSWRecipeTooltip')
