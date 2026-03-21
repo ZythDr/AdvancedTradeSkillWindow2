@@ -72,7 +72,8 @@ local ToolID = {
 	['Runed Silver Rod'				] 		= 6339,
 	['Runed Golden Rod'			] 		= 11130,
 	['Runed Truesilver Rod'		] 		= 11145,
-	['Runed Arcanite Rod'			] 		= 16207
+	['Runed Arcanite Rod'			] 		= 16207,
+	['Whittle'						] 		= 42004		-- TurtleWoW: custom Survival tool (item ID 42004)
 }
 
 local Professions	= {
@@ -831,6 +832,9 @@ local function GetCraftRequirements	(Index)
 end
 
 local function SelectCraftItem				(Index)
+	-- TurtleWoW: guard against nil index from GetPositionFromGame (Survival profession can return nil)
+	if not Index then return end
+	
 	if TradeSkill	then	return SelectTradeSkill(Index)
 						else	return SelectCraft(Index) end
 end
@@ -912,6 +916,11 @@ local function AddRecipe(Index)
 	R.Name, 		R.SubName, 		R.Type, 			R.Texture, 	R.Link, 	R.ProductMin, 	R.ProductMax,
 	R.Cooldown, 	R.ReagentsSize, 	R.TrainingCost, 	R.RequiredLevel = GetCraftData(Index)
 	R.Position = Index
+	
+	-- TurtleWoW: Survival recipes can return nil/empty names; skip them
+	if not R.Name or R.Name == '' then
+		return
+	end
 	
 	for I = 1, R.ReagentsSize do
 		Rt = R.Reagents[I]
@@ -1573,7 +1582,9 @@ function ATSW_OnLoad()
 		'CHAT_MSG_SKILL',
 		'CHAT_MSG_LOOT',
 		'CVAR_UPDATE',
-		'UI_ERROR_MESSAGE')
+		'UI_ERROR_MESSAGE',
+		'PLAYER_REGEN_DISABLED',		-- TurtleWoW: InCombatLockdown() is 2.x+ only; track combat via events instead
+		'PLAYER_REGEN_ENABLED')
 	
 	-- Attach name sort checkbox
 	ATSWNameSortCheckbox:SetPoint('LEFT', ATSWDifficultySortCheckbox, 'RIGHT', ATSWDifficultySortCheckboxText2:GetWidth()+5, 0)
@@ -1597,16 +1608,6 @@ function ATSW_OnLoad()
 	
 	-- Fix a bug which shows error 'skillOffset is nil' on line 171 of Blizzard_TradeSkillUI.lua (modified by Turtle-WoW team)
 	FauxScrollFrame_SetOffset(TradeSkillListScrollFrame, 0)
-	
-	ATSWFrame:SetMovable(true)
-	ATSWFrame:EnableMouse(true)
-	ATSWFrame:RegisterForDrag('LeftButton')
-	ATSWFrame:SetScript('OnDragStart', function() this:StartMoving() end)
-	ATSWFrame:SetScript('OnDragStop',
-		function()
-			this:StopMovingOrSizing()
-		end
-	)
 end
 
 local function SetDropDownFilter(SubClass, InvSlot)
@@ -2103,22 +2104,18 @@ function ATSW_SwitchToFrame(Frame)
 		local F = GetFrame(I)
 		
 		if not F:IsVisible() and F == Frame then
-			ShowUIPanel				(F)
+			-- TurtleWoW: ShowUIPanel(F) triggers recursive UpdateUIPanelPositions -> stack overflow.
+			-- Use F:Show() + SetLeftFrame to register the frame without triggering the recursion.
+			F:Show()
 			ATSW_AttachTabsTo	(F)
 			
 			if not (BlizzMo and ATSWFrame.settings and ATSWFrame.settings.save) then
 				if MerchantFrame:IsVisible() then
-					local oldCenter = UIParent.center
-					
 					UIParent.center = nil
 					SetCenterFrame(F)
-					UIParent.center = oldCenter
 				else
-					local oldLeft = UIParent.left 
-					
-					UIParent.left = nil
+					UIParent.left = nil		-- nil first so SetLeftFrame registers this frame (not the old one)
 					SetLeftFrame(F)
-					UIParent.left = oldLeft
 				end
 			end
 		end
@@ -2145,8 +2142,9 @@ local function LoadAllProfessionsOnce()
 		ATSWFrame:	UnregisterEvent(	'CRAFT_SHOW'				)
 		ATSWFrame:	UnregisterEvent(	'CRAFT_CLOSE'				)
 		
+		local function Stub() end
 		local OldSound 				= PlaySound
-		PlaySound 					= Stub
+		PlaySound 						= Stub
 		
 		for I in ipairs(Professions) do
 			local ProfessionTexture = Icon(Professions[I])
@@ -2369,6 +2367,7 @@ function ATSW_UpdateBackground()
 	
 	if BG then
 		ATSWBackground:SetTexture('Interface\\AddOns\\AdvancedTradeSkillWindow2\\Textures\\Background\\' .. BG)
+		ATSWBackground:SetDrawLayer('ARTWORK', 1)	-- TurtleWoW: draw above ATSWBackgroundShadow (sublevel 0)
 	else
 		ATSWBackground:SetTexture(nil)
 	end
@@ -2630,25 +2629,33 @@ function ATSW_OnEvent()
 		
 		ATSW_StopProcessing()
 		
+	-- TurtleWoW: InCombatLockdown() unavailable in 1.12; maintain combat flag via events
+	elseif	event == 'PLAYER_REGEN_DISABLED'			then
+		ATSW_InCombat = true
+	
+	elseif	event == 'PLAYER_REGEN_ENABLED'			then
+		ATSW_InCombat = false
+	
 	elseif 	event == 'PLAYER_ENTERING_WORLD' 			then
 		
 		ATSW_SaveBag(0)
 		ATSW_Hide()
 		
-		-- Initialize Table
-		local Table = ATSW_NecessaryReagents
-
-		if Table == nil then
-			Table = {}
+		local function InitializeTable(Table, Value, Prof)
+			if Table == nil then
+				Table = {}
+			end
+			
+			if Table[realm] == nil then
+				Table[realm] = {}
+			end
+			
+			if Table[realm][player] == nil then
+				Table[realm][player] = Value
+			end
 		end
 		
-		if Table[realm] == nil then
-			Table[realm] = {}
-		end
-		
-		if Table[realm][player] == nil then
-			Table[realm][player] = {}
-		end
+		InitializeTable(ATSW_NecessaryReagents, {})
 		
 		if ATSW_Characters then 
 			if ATSW_Characters[realm] then
@@ -2889,6 +2896,21 @@ function ATSWRecipeButton_OnClick(Button)
 	end
 end
 
+function ATSWRecipe_OnClick()
+	local Link = this.Link
+	if Key.Ctrl() and not Key.Shift() and not Key.Alt() and Link then
+		DressUpItemLink(Link)
+	elseif not Key.Ctrl() and Key.Shift() and not Key.Alt() and Link then
+		if WIM_EditBoxInFocus then
+			WIM_EditBoxInFocus:Insert(Link)
+		elseif ChatFrameEditBox:IsVisible() then
+			ChatFrameEditBox:Insert(Link)
+		end
+	elseif arg1 == 'RightButton' then
+		InsertIntoAuction(Link)
+	end
+end
+
 function ATSW_TaskDeleteOnClick()
 	ATSW_DeleteTask(this:GetParent().Name)
 end
@@ -3051,38 +3073,9 @@ function ATSW_ToggleOptionsFrame()
 		ATSWOFTooltipButton:					SetChecked(ATSW_Options.RecipeTooltip)
 		ATSWOFShoppingListButton:			SetChecked(ATSW_Options.DisplayShoppingList)
 		
-        ShowUIPanel(ATSWConfigFrame)
-    end
-end
-
-function ATSWRecipe_OnClick()
-	local Link = this.Link
-	
-    if arg1 == 'RightButton' then
-        InsertIntoAuction(Link)
-	elseif arg1 == 'LeftButton' then
-		if Key.Ctrl() and not Key.Shift() and not Key.Alt() then
-			DressUpItemLink(Link)
-		elseif not Key.Ctrl() and Key.Shift() and not Key.Alt() then
-			if WIM_EditBoxInFocus then
-				WIM_EditBoxInFocus:Insert(Link)
-			elseif ChatFrameEditBox:IsVisible() then
-				ChatFrameEditBox:Insert(Link)
-			else
-				if Link then
-					ATSWSearchBox:SetText(':r ' .. (LinkToName(Link) or ''))
-				end
-			end
-		elseif string.find(this:GetName(), 'ATSWReagent') then
-			local ReagentID = ATSW_LinkToID(GetReagentLink(GetPositionFromGame(RecipeSelected()), this:GetID()))
-			
-			for I = 1, RecipesSize() do
-				if ReagentID == ATSW_LinkToID(Recipe(I).Link) then
-					table.insert(PreviousRecipes(), RecipeSelected())
-					
-					ATSW_SelectRecipe(Recipe(I).Name)
-				end
-			end
+		-- TurtleWoW: ShowUIPanel triggers recursive UpdateUIPanelPositions in combat causing stack overflow
+		if not ATSW_InCombat then
+			ShowUIPanel(ATSWConfigFrame)
 		end
 	end
 end
@@ -3773,7 +3766,7 @@ local function GetAttributes(Recipe)
 						if Item.Return then
 							local Minus = ''
 							
-							if Item.ReplaceWords == 1then
+							if Item.ReplaceWords == 1 then
 								A = ReplaceWords(A)
 							end
 							
@@ -4233,12 +4226,19 @@ end
 function ATSW_ShowRecipe(Name)
 	local GamePosition = GetPositionFromGame(Name)
 	
-	SelectCraftItem(GamePosition)
+	if GamePosition then
+		SelectCraftItem(GamePosition)
+	end
 	
 	ATSWRecipeName:Show()
 	ATSWRecipeIcon:Show()
 	
 	local Recipe = Recipe(GetRecipePosition(Name))
+	
+	-- TurtleWoW: Survival recipes may not have a local entry; bail out gracefully
+	if not Recipe then
+		return
+	end
 	
 	-- Name
 	ATSWRecipeName:SetText(Recipe.Name)
@@ -5585,11 +5585,54 @@ function CreateDynamicTooltip(TooltipName)
         CreateTooltipLine(IconPath, LeftText, RightText, R, G, B)
     end
 
+    -- Three-column line: Col1=Bags, Col2=Bank, Col3=Alts
+    -- Each column is a fixed-width CENTER-justified FontString anchored by its right
+    -- edge at a constant offset from the tooltip right, so headers and values always
+    -- share the same centre point regardless of digit count.
+    --   Column width:  40px  (fits "Bags"/"Bank"/"Alts" and up to "9999")
+    --   Gap between columns: 8px
+    --   Right edges from tooltip right:  Alts=-10  Bank=-58  Bags=-106
+    function Tooltip:AddColumnLine(IconPath, LeftText, Col1Text, Col2Text, Col3Text, R, G, B)
+        CreateTooltipLine(IconPath, LeftText, nil, R, G, B)
+        local LineIndex = Tooltip.NumLines
+        local LeftFontString = _G[Name .. 'TextLeft' .. LineIndex]
+        local COL_WIDTH = 40
+        local cols = {
+            { suffix = 'TextCol1', text = Col1Text, rightOffset = -106 }, -- Bags
+            { suffix = 'TextCol2', text = Col2Text, rightOffset = -58  }, -- Bank
+            { suffix = 'TextCol3', text = Col3Text, rightOffset = -10  }, -- Alts
+        }
+        for _, col in ipairs(cols) do
+            local fs = _G[Name .. col.suffix .. LineIndex]
+            if not fs then
+                fs = Tooltip:CreateFontString(Name .. col.suffix .. LineIndex, 'ARTWORK', 'GameTooltipText')
+            end
+            fs:SetFont('Fonts\\FRIZQT__.ttf', 12)
+            fs:SetTextColor(1, 0.82, 0)
+            fs:SetWidth(COL_WIDTH)
+            fs:SetJustifyH('CENTER')
+            fs:ClearAllPoints()
+            fs:SetPoint('TOP', LeftFontString, 'TOP')
+            fs:SetPoint('RIGHT', Tooltip, 'RIGHT', col.rightOffset, 0)
+            local t = col.text
+            if t and t ~= '' then
+                fs:SetText(t)
+                fs:Show()
+            else
+                fs:SetText('')
+                fs:Hide()
+            end
+        end
+    end
+
     function Tooltip:ClearLines()
         for I = Tooltip.NumLines, 1, -1 do
             ClearFrameObject(_G[Name .. 'TextureLeft' .. I], true)
             ClearFrameObject(_G[Name .. 'TextLeft' .. I], false)
             ClearFrameObject(_G[Name .. 'TextRight' .. I], false)
+            ClearFrameObject(_G[Name .. 'TextCol1' .. I], false)
+            ClearFrameObject(_G[Name .. 'TextCol2' .. I], false)
+            ClearFrameObject(_G[Name .. 'TextCol3' .. I], false)
         end
 
         Tooltip.NumLines = 0
@@ -5725,8 +5768,8 @@ function ATSW_ShowRecipeTooltip()
 	-- Required reagents
 	
 	Tooltip:AddTextLine(' ')
-	Tooltip:AddDoubleLine(nil, ATSW_TOOLTIP_NECESSARY,
-		ATSW_TOOLTIP_INBAGS 	.. '   ' .. ATSW_TOOLTIP_INBANK .. '   ' .. ATSW_TOOLTIP_ONALTS)
+	Tooltip:AddColumnLine(nil, ATSW_TOOLTIP_NECESSARY,
+		ATSW_TOOLTIP_INBAGS, ATSW_TOOLTIP_INBANK, ATSW_TOOLTIP_ONALTS)
 	
 	-- Reagents
 	
@@ -5750,32 +5793,16 @@ function ATSW_ShowRecipeTooltip()
 				Amountstring 	= Color.GREY .. ' (' .. R.Amount .. ')|r'
 			end
 			
-			if Bags == 0 then
-				Bags = ''
-			end
-			
-			if Bank == 0 then
-				Bank = ''
-			end
-			
-			if Alts == 0 then
-				Alts = ''
-			end
-			
-			local BagStr, BankStr, AltsStr = Bags, Bank, Alts
-			
-			BagStr 	= AddSpace	(BagStr				)
-			BankStr	= AddSpace	(BankStr			)
-			AltsStr 	= AddSpace	(AltsStr				)
-			BagStr	= AddColor	(BagStr, 	Bags	)
-			BankStr	= AddColor	(BankStr, 	Bank	)
-			AltsStr	= AddColor	(AltsStr,		Alts	)
-			
 			local cR, cG, cB = GetLinkColorRGB(R.Link)
 			
-			Tooltip:AddDoubleLine(R.Texture, 
-				(R.Name or '') .. Amountstring .. Merchant, 
-				BagStr 	.. '       ' .. BankStr .. '       ' .. AltsStr .. ' ', cR, cG, cB)
+			local function ColVal(n)
+				if n == 0 then return '' end
+				return '|cffffffff' .. n .. '|r'
+			end
+			
+			Tooltip:AddColumnLine(R.Texture,
+				(R.Name or '') .. Amountstring .. Merchant,
+				ColVal(Bags), ColVal(Bank), ColVal(Alts), cR, cG, cB)
 		end
 	end
 	
@@ -5980,39 +6007,39 @@ function ATSW_GetAltsAmount(Name)
     return GetAltsAmountInBags(Name) + GetAltsAmountInBank(Name)
 end
 
-local function GetLocation(Table, In)
-	if Name then
-		for RName in pairs(Table) do
-			if RName == realm then
-				for PName in pairs(Table[RName]) do
-					if PName ~= player then
-						local Amount = 0
-						
-						if Table == ATSW_Bags then
-							Amount = Amount + GetAltsAmountInBags(Name, PName)
-						elseif Table == ATSW_Bank then
-							Amount = Amount + GetAltsAmountInBank(Name, PName)
-						end
-						
-						if Amount > 0 then
-							if not HeaderAdded then
-								Tooltip:AddTextLine(ATSW_TOOLTIP_POSSESS .. ' ' .. this:GetParent().Link .. ':')
-								
-								HeaderAdded = true
+function ATSW_GetAltsLocationIntoTooltip(Name)
+	local HeaderAdded = false
+	local Tooltip = ATSWRecipeTooltip
+	
+	local function GetLocation(Table, In)
+		if Name then
+			for RName in pairs(Table) do
+				if RName == realm then
+					for PName in pairs(Table[RName]) do
+						if PName ~= player then
+							local Amount = 0
+							
+							if Table == ATSW_Bags then
+								Amount = Amount + GetAltsAmountInBags(Name, PName)
+							elseif Table == ATSW_Bank then
+								Amount = Amount + GetAltsAmountInBank(Name, PName)
 							end
 							
-							Tooltip:AddTextLine(ClassColorize(PName) .. ': ' .. '|cffffffff' .. Amount .. '|r ' .. In)
+							if Amount > 0 then
+								if not HeaderAdded then
+									Tooltip:AddTextLine(ATSW_TOOLTIP_POSSESS .. ' ' .. this:GetParent().Link .. ':')
+									
+									HeaderAdded = true
+								end
+								
+								Tooltip:AddTextLine(ClassColorize(PName) .. ': ' .. '|cffffffff' .. Amount .. '|r ' .. In)
+							end
 						end
 					end
 				end
 			end
 		end
 	end
-end
-
-function ATSW_GetAltsLocationIntoTooltip(Name)
-	local HeaderAdded = false
-	local Tooltip = ATSWRecipeTooltip
 	
 	Tooltip:ClearLines()
 	Tooltip:SetOwner(this, 'ANCHOR_BOTTOMRIGHT', 0)
@@ -6046,42 +6073,37 @@ function ATSW_IsInMerchant(Name)
 end
 
 local function GetMerchantReagentsPrice(Buy)
-	if not (MerchantFrame:IsVisible() and NecessaryReagentsSize() > 0) then
-		return
-	end
-	
-	local TotalPrice = 0
-	
-	for N = 1, NecessaryReagentsSize() do
-		-- Calculate total price
-		local Item = NecessaryReagent(N)
+	if MerchantFrame:IsVisible() and NecessaryReagentsSize() > 0 then
+		local TotalPrice = 0
 		
-		for M = 1, GetMerchantNumItems() do
-			local MName, _, MPrice, MQuantity, MAvailable = GetMerchantItemInfo(M)
-			
-			if Item.Name == MName then
-				local HaveQuantity	= ATSW_GetBagsAmount(Item.Name) + (ATSW_ConsigerBank and ATSW_GetBankAmount(Item.Name) or 0)
-				local NeedQuantity	= Item.Amount - HaveQuantity
-				local BuyQuantity = math.ceil(NeedQuantity / MQuantity)
+		local function GetTotalPrice(Item)
+			for M = 1, GetMerchantNumItems() do
+				local MName, _, MPrice, MQuantity, MAvailable = GetMerchantItemInfo(M)
 				
-				if BuyQuantity > MAvailable and MAvailable > 0 then
-					BuyQuantity = MAvailable
-				end
-				
-				if BuyQuantity < 0 then
-					BuyQuantity = 0
-				end
-				
-				TotalPrice = TotalPrice + BuyQuantity * MPrice
-				
-				if Buy and BuyQuantity > 0 then
-					BuyMerchantItem(M, BuyQuantity)
+				if Item.Name == MName then
+					local HaveQuantity	= ATSW_GetBagsAmount(Item.Name) + (ATSW_ConsigerBank and ATSW_GetBankAmount(Item.Name) or 0)
+					local NeedQuantity	= Item.Amount - HaveQuantity
+					local BuyQuantity = math.ceil(NeedQuantity / MQuantity)
+					
+					if BuyQuantity > MAvailable and MAvailable > 0 then
+						BuyQuantity = MAvailable
+					end
+					
+					if BuyQuantity < 0 then BuyQuantity = 0 end
+					
+					TotalPrice = TotalPrice + BuyQuantity * MPrice
+					
+					if Buy and BuyQuantity > 0 then BuyMerchantItem(M, BuyQuantity) end
 				end
 			end
 		end
+		
+		for N = 1, NecessaryReagentsSize() do
+			GetTotalPrice(NecessaryReagent(N))
+		end
+		
+		return TotalPrice
 	end
-	
-	return TotalPrice
 end
 
 function ATSW_SetBuyFrameVisible()
@@ -6132,52 +6154,52 @@ end
 ATSWSkillUpCache = {}
 
 function ATSW_SkillUps(Name)
-	if not ATSW_AtlasLoot then
-		return
-	end
-
-	if ATSWSkillUpCache[Name] then
-		local C = ATSWSkillUpCache[Name]
+	local Skill
+	
+	if ATSW_AtlasLoot then
+		local Found = false
 		
-		return C[1], C[2], C[3], C[4]
-	end
-	
-	local Texture = ATSW_GetProfessionTexture(Profession())
-	
-	if not (Texture and ProfessionNamesForAtlasLoot[Texture]) then
-		return
-	end
-	
-	local Found = false
-	
-	for _, Item in pairs(ProfessionNamesForAtlasLoot[Texture]) do
-		if Item ~= '' and ATSW_AtlasLoot[Item] then
-			for _, Info in pairs(ATSW_AtlasLoot[Item]) do
-				for N, Param in pairs(Info) do
-					if N == 3 and string.sub(Param, 5, -1) == Name then
-						Found = true
-					end
-					
-					if N == 4 and Found then
-						-- AtlasLoot item example:
-						-- { 's3924', 'inv_gizmo_pipe_02', '=q1=Copper Tube', '=ds=#sr# =so1=50 =so2=80 =so3=95 =so4=110' },
-						-- =so parameters contain difficulty of the skill
-						
-						local _, _, SU1, SU2, SU3, SU4 = string.find(Param, '=so1=(.+)%s*=so2=(.+)%s*=so3=(.+)%s*=so4=(.+)')
+		if ATSWSkillUpCache[Name] then
+			local C = ATSWSkillUpCache[Name]
+			
+			return C[1], C[2], C[3], C[4]
+		end
+		
+		local Texture = ATSW_GetProfessionTexture(Profession())
+		
+		if Texture then
+			for _, Item in pairs(ProfessionNamesForAtlasLoot[Texture]) do
+				if Item ~= '' then
+					for _, Info in pairs(ATSW_AtlasLoot[Item]) do
+						for N, Param in pairs(Info) do
+							if N == 3 and string.sub(Param, 5, -1) == Name then
+								Found = true
+							end
+							
+							if N == 4 and Found then
+								-- AtlasLoot item example:
+								-- { 's3924', 'inv_gizmo_pipe_02', '=q1=Copper Tube', '=ds=#sr# =so1=50 =so2=80 =so3=95 =so4=110' },
+								-- =so parameters contain difficulty of the skill
+								
+								local _, _, SU1, SU2, SU3, SU4 = string.find(Param, '=so1=(.+)%s*=so2=(.+)%s*=so3=(.+)%s*=so4=(.+)')
 
-						SU1 = tonumber(SU1)
-						SU2 = tonumber(SU2)
-						SU3 = tonumber(SU3)
-						SU4 = tonumber(SU4)
-						
-						ATSWSkillUpCache[Name] = ATSWSkillUpCache[Name] or {SU1, SU2, SU3, SU4}
+								SU1 = tonumber(SU1)
+								SU2 = tonumber(SU2)
+								SU3 = tonumber(SU3)
+								SU4 = tonumber(SU4)
+								
+								ATSWSkillUpCache[Name] = {SU1, SU2, SU3, SU4}
 
-						return SU1, SU2, SU3, SU4
+								return SU1, SU2, SU3, SU4
+							end
+						end
 					end
 				end
 			end
 		end
 	end
+	
+	return Skill
 end
 
 function ATSW_CompareSkill(Name)

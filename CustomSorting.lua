@@ -223,42 +223,32 @@ function ATSWCS_OnLoad()
 		getglobal('ATSWCSRecipe'..I..'Highlight'):SetDesaturated(true)
 	end
 	
-	local Color = ATSWTypeColor['header']
-	
-	ATSWCSHighlightTexture:SetVertexColor(Color.R, Color.G, Color.B, 0.8)
-	
-	ATSWCSFrame:SetMovable(true)
-	ATSWCSFrame:EnableMouse(true)
-	ATSWCSFrame:RegisterForDrag('LeftButton')
-	ATSWCSFrame:SetScript('OnDragStart', function() this:StartMoving() end)
-	ATSWCSFrame:SetScript('OnDragStop',
-		function()
-			this:StopMovingOrSizing()
-		end
-	)
+	-- Guard against ATSWTypeColor not being defined yet (load order issue)
+	if ATSWTypeColor and ATSWTypeColor['header'] then
+		local Color = ATSWTypeColor['header']
+		ATSWCSHighlightTexture:SetVertexColor(Color.R, Color.G, Color.B, 0.8)
+	end
 end
 
 function ATSWCS_OnShow()
 	Name = Profession()
 	
-	if not Name then
-		return
-	end
-	
-	ATSWCSFrameTitleText:SetText(ATSWCS_TITLE .. ' (' .. Name .. ')')
-	
-	--Set Skill Portrait
-	SetPortraitToTexture(ATSWCSFramePortrait, ATSW_GetProfessionTexture(Name))
-	
-	--Fill items list
-	if ATSWCS_PreviousSkill ~= Profession() then
-		ATSWCS_FillAllRecipes()
+	if Name then
+		ATSWCSFrameTitleText:SetText(ATSWCS_TITLE .. ' (' .. Name .. ')')
 		
-		ATSWCS_PreviousSkill = Profession()
+		--Set Skill Portrait
+		SetPortraitToTexture(ATSWCSFramePortrait, ATSW_GetProfessionTexture(Name))
+		
+		--Fill items list
+		if ATSWCS_PreviousSkill ~= Profession() then
+			ATSWCS_FillAllRecipes()
+			
+			ATSWCS_PreviousSkill = Profession()
+		end
+		
+		ATSWCSFrame:SetPoint(ATSWFrame:GetPoint())
+		ATSWCS_Update()
 	end
-	
-	ATSWCS_Update()
-	ATSWUpdaterFrame:Show()
 end
 
 function ATSWCSAddButton_OnClick()
@@ -739,7 +729,9 @@ function ATSWCS_GetItemFromCategories(Need)
 				NextIndex = NextIndex + 1
 				
 				if NextIndex == Need then
-					local Type = ATSW_Recipe(ATSW_GetRecipePosition(Item(C, I).Name)).Type
+					local recipe = ATSW_Recipe(ATSW_GetRecipePosition(Item(C, I).Name))
+					-- TurtleWoW: Survival recipes may not exist in current profession; default to 'trivial'
+					local Type = recipe and recipe.Type or 'trivial'
 					return C, I, Item(C, I).Name, Item(C, I).SubName, Type, Item(C, I).Texture
 				end
 			end

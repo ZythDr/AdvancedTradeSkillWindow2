@@ -1,7 +1,27 @@
 # Advanced Trade Skill Window 2
 Improved window for your professions for World of Warcraft vanilla
 
-<sub>version 2.1.15</sub>
+<sub>version 2.1.16</sub>
+
+---
+
+## Turtle WoW Fork
+
+This is a fork of [Shellyoung/AdvancedTradeSkillWindow2](https://github.com/Shellyoung/AdvancedTradeSkillWindow2) with compatibility fixes for **Turtle WoW patch 1.18.1**.
+
+### Patch 1.18.1 compatibility fixes (v2.1.16)
+
+- **Survival profession support** — The new Survival profession can return `nil` recipe names and indices from the game API. Added nil guards in `SelectCraftItem`, `AddRecipe`, and `ATSW_ShowRecipe` to prevent crashes when opening the Survival tradeskill window.
+- **`Whittle` tool** — Added the new Survival tool *Whittle* (item ID 42004) to the tool icon/availability lookup table so it displays correctly in the detail panel.
+- **`InCombatLockdown()` unavailable** — `InCombatLockdown()` was added in TBC and does not exist in WoW 1.12. Replaced all usages with event-driven tracking via `PLAYER_REGEN_DISABLED` / `PLAYER_REGEN_ENABLED`.
+- **UIPanel stack overflow fix** — `ShowUIPanel()` for `area='left'` frames triggers a recursive `UpdateUIPanelPositions` call on Turtle WoW's patched UI, causing a stack overflow. Replaced with `Frame:Show()` + `SetLeftFrame()` directly, removing the save/restore pattern that was also preventing the Escape key from closing the window.
+- **`ATSWRecipe_OnClick` nil** — Added the missing global function `ATSWRecipe_OnClick` (called from XML) which handles Ctrl‑click (dress up), Shift‑click (insert link to chat), and right‑click (search auction house) on the large recipe icon in the detail panel.
+- **`1then` syntax error** — Fixed a missing space typo (`1then` → `1 then`) in the GetAttributes block that caused a compile failure.
+- **CustomSorting nil crash** — Added a nil guard in `ATSWCS_GetItemFromCategories` for recipes that exist in another profession but not the currently open one (defaulting to `'trivial'`).
+- **Reagent tooltip column alignment** — Replaced the single concatenated right‑aligned string used for Bags/Bank/Alts counts with three separate fixed‑width center‑justified FontStrings per row, so columns remain aligned regardless of digit count or font rendering.
+- **Background artwork draw order** — `ATSWBackground` (profession art) was rendered behind `ATSWBackgroundShadow`, causing the shadow texture to obscure the left panel. Moved background art to ARTWORK sublevel 1 so it draws in front of the shadow layer.
+
+---
 
 ![face](https://github.com/user-attachments/assets/cffb06ff-b310-4fb7-ba07-a04caf6e34a3)
 

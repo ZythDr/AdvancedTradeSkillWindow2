@@ -918,6 +918,8 @@ local function hook_show_recipe()
     end
 end
 
+-- MODIFIED: Hook show recipe to append ONLY the Total Cost line at the bottom
+-- Do NOT call the original tooltip function to avoid any layout modifications
 hook_show_recipe()
 
 -- Safety wrapper: avoid nil concatenation in ATSW_GetAltsLocationIntoTooltip
@@ -977,7 +979,8 @@ local function ensure_alts_tooltip_safe()
     rawset(_G, 'ATSW_GetAltsLocationIntoTooltip', safe_GetAltsLocationIntoTooltip)
 end
 
-ensure_alts_tooltip_safe()
+-- DISABLED: This hook was modifying tooltip layout which caused column misalignment
+-- ensure_alts_tooltip_safe()
 
 local function hide_recipe_tooltips()
     local recipeTooltip = fetch_global('ATSWRecipeTooltip')
@@ -1026,6 +1029,10 @@ local function install_tooltip_watchdog()
             return
         end
         elapsed = 0
+        -- TurtleWoW: ATSW_InCombat replaces InCombatLockdown() which is unavailable in 1.12
+        if ATSW_InCombat then
+            return
+        end
         local atswFrame = fetch_global('ATSWFrame')
         if atswFrame and atswFrame.IsShown and not atswFrame:IsShown() then
             hide_recipe_tooltips()
