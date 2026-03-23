@@ -2085,8 +2085,8 @@ function ATSW_AttachTabsTo(Frame)
 	if ATSWFrameSideTabsFrame:GetParent() ~= Frame then
 		ATSWFrameSideTabsFrame:SetParent(Frame)
 		ATSWFrameSideTabsFrame:SetPoint('TOPLEFT', Frame, 'TOPRIGHT', -59, -28)
-		ATSWFrameSideTabsFrame:Show()
 	end
+	ATSWFrameSideTabsFrame:Show()
 end
 
 function ATSW_SwitchToFrame(Frame)
@@ -2096,6 +2096,8 @@ function ATSW_SwitchToFrame(Frame)
 	end
 	
 	ATSW_SwitchingFrames = true
+
+	local wasAlreadyOpen = GetFrame(1):IsVisible() or GetFrame(2):IsVisible()
 	
 	if ATSW_SwitchingToMain then
 		ATSW_SwitchingToMain = false
@@ -2121,12 +2123,15 @@ function ATSW_SwitchToFrame(Frame)
 		local F = GetFrame(I)
 		
 		if not F:IsVisible() and F == Frame then
-			-- TurtleWoW: ShowUIPanel(F) triggers recursive UpdateUIPanelPositions -> stack overflow.
-			-- Use F:Show() + SetLeftFrame to register the frame without triggering the recursion.
 			F:Show()
-			ATSW_AttachTabsTo	(F)
+
+			if F == ATSWCSFrame then
+				ATSWFrameSideTabsFrame:Hide()
+			else
+				ATSW_AttachTabsTo(F)
+			end
 			
-			if not (BlizzMo and ATSWFrame.settings and ATSWFrame.settings.save) then
+			if not wasAlreadyOpen and not (BlizzMo and ATSWFrame.settings and ATSWFrame.settings.save) then
 				if MerchantFrame:IsVisible() then
 					UIParent.center = nil
 					SetCenterFrame(F)
