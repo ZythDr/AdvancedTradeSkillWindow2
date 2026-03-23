@@ -367,6 +367,7 @@ ATSW_Options = {
 	RecipeTooltip 				= true,
 	AutoBuy 						= false,
 	DisplayShoppingList 			= true,
+	Scale 							= 1,
 }
 
 ATSW_Attributes = {}
@@ -1608,6 +1609,22 @@ function ATSW_OnLoad()
 	
 	-- Fix a bug which shows error 'skillOffset is nil' on line 171 of Blizzard_TradeSkillUI.lua (modified by Turtle-WoW team)
 	FauxScrollFrame_SetOffset(TradeSkillListScrollFrame, 0)
+
+	ATSWFrame:SetMovable(true)
+	ATSWFrame:EnableMouse(true)
+	ATSWFrame:RegisterForDrag('LeftButton')
+	ATSWFrame:SetScript('OnDragStart', function() this:StartMoving() end)
+	ATSWFrame:SetScript('OnDragStop', function() this:StopMovingOrSizing() end)
+
+	ATSWFrame:EnableMouseWheel(true)
+	ATSWFrame:SetScript('OnMouseWheel', function()
+		if IsControlKeyDown() then
+			local newScale = math.max(0.5, math.min(2.0, this:GetScale() + arg1 * 0.1))
+			ATSW_Options.Scale = newScale
+			ATSWFrame:SetScale(newScale)
+			ATSWCSFrame:SetScale(newScale)
+		end
+	end)
 end
 
 local function SetDropDownFilter(SubClass, InvSlot)
@@ -2640,6 +2657,10 @@ function ATSW_OnEvent()
 		
 		ATSW_SaveBag(0)
 		ATSW_Hide()
+
+		local scale = ATSW_Options.Scale or 1
+		ATSWFrame:SetScale(scale)
+		ATSWCSFrame:SetScale(scale)
 		
 		local function InitializeTable(Table, Value, Prof)
 			if Table == nil then

@@ -244,24 +244,24 @@ v0.5.5b:
 - fix ruRU locale
 
 v2.0.0 (Year 2022)
-• Full code rework: no more errors, no more freezes, no more memory overload
-• Interface enhancement: 
+ï¿½ Full code rework: no more errors, no more freezes, no more memory overload
+ï¿½ Interface enhancement: 
 	- Items have icons
 	- Crafting requirements and queue have graphical art
 	- Queue have progress bar
 	- Main window have tabs for professions
-• Filter parameters names are changed to: :level, :rarity, :quality, :possible, :possibletotal
-• Filter rarity can now receive parameters of rarity names (example: :rarity epic, :rarity uncommon)
-• Removed compatibility with LS3D craft info, Fizzwidgets ReagentCost
+ï¿½ Filter parameters names are changed to: :level, :rarity, :quality, :possible, :possibletotal
+ï¿½ Filter rarity can now receive parameters of rarity names (example: :rarity epic, :rarity uncommon)
+ï¿½ Removed compatibility with LS3D craft info, Fizzwidgets ReagentCost
 
 v2.0.1
-• Graphical error fixes:
+ï¿½ Graphical error fixes:
 	- Recipes scroll bar was not updating on ATSWFrame show
 	- Flash appearance and disappearance animation speed was incorrect
 	- Progress stop button was not hiding if task was completed
 	- Recipe tooltip reagents posession was rendering disaligned
 	- Progress bar flash texture was becoming white if video mode was changing
-• Data flow fixes:
+ï¿½ Data flow fixes:
 	- Reagent quantity data was not flowing into necessary items list if the list was invisible
 	- Reagent quantity data was not flowing into bank column if bank slots was changing
 	- Auction shopping list was not updating if necessary items list was changing
@@ -271,15 +271,15 @@ v2.0.1
 v2.0.2
 I nearly added poison interface for rogues but got account-banned on Turtle-WoW for the silly joke "Who is Nate Higgers?" in the World chat
 
-• Data flow fixes:
+ï¿½ Data flow fixes:
 	- Crafting button didn't check for AuctionFrame variable existence before checking it for visibility
 	
 v2.0.3
-• Graphical error fixes:
+ï¿½ Graphical error fixes:
 	- ATSWCS_TRADESKILLLISTTITLE was missing one "L" letter in Localization.lua
 
 v2.1.0
-• New features:
+ï¿½ New features:
 	-  Tasks remember craft time
 	-  Skill-up levels from AtlasLoot addon are used by difficulty sort and recipe tooltip
 	-  Custom category rename button have been added
@@ -293,11 +293,11 @@ v2.1.0
 	-  Background pictures for professions
 	-  Smelting progress bar is colorized into the color of an appropriate ore
 
-• Graphical error fixes:
+ï¿½ Graphical error fixes:
 	- Custom recipe items' left alignment was 22 pixels to the right instead of 0
 	- Custom recipe items' width was not related to its texts' width
 	
-• Data flow fixes:
+ï¿½ Data flow fixes:
 	- ATSW_Characters[realm] table did not create if a character on a new realm was created
 	- Progress bar was not reacting on crafting errors like "Inventory is full."
 	- Custom categories frame was not updating after a recipe craft
@@ -308,24 +308,24 @@ v2.1.0
 	- Time left for a task was calculating 1 second lower
 
 v2.1.1
-• Data flow fixes:
+ï¿½ Data flow fixes:
 	- Crafting window did not close if zone changed
 	
-• Graphical error fixes:
+ï¿½ Graphical error fixes:
 	- Control button panel can no more be changed to white texture
 	- Task scroll bar moved a bit to the right
 	
 v2.1.2
-• New features:
+ï¿½ New features:
 	- Chinese language translation
 	
-• Graphical changes:
+ï¿½ Graphical changes:
 	- Create button stay pushed if creating something
 	- Buttons highlight font color is same as normal font color
 	- Sort, Unified, Separated buttons type are radio button, not checkbox
 	- New background for cooking profession
 	
-• Data flow fixes:
+ï¿½ Data flow fixes:
 	- Calculation of estimated time of craft was too high
 	- Necessary reagents for a craftable reagent did not fill if the reagent was stored in a bag
 	- Unified look did not consider options for possible count
@@ -333,107 +333,111 @@ v2.1.2
 	- Shift button is not required for inserting any item into aux addon search field
 	- Saying reagents that require to craft an item require dialog confirmation
 	
-• Graphical error fixes:
+ï¿½ Graphical error fixes:
 	- Custom editor category width was less then recipe category width
 	- Necessary reagent item was not long enough
 	- Merchant frame was overlapping over the main frame
 	- Main Frame was drawing under Luna Unit Frames and NotGrid addons
 
 v2.1.3
-• New features:
+ï¿½ New features:
 	- Support of old aux addon with Blizzard-like GUI
 	- Crafting time (time cost), enchanting items icons can be acquired from AtlasLoot addon
 
-• Data flow fixes:
+ï¿½ Data flow fixes:
 	- Uncategorized category was not showing if it was collapsed
 	- Conflict with BlizzMo addon
 	- A click on necessary reagent in auction shopping list with Post tab of aux addon being opened was generating an error
 	- A strange error in which Profession() function was inquiring an empty array value which was supposed to be filled
 
-• Graphical error fixes:
+ï¿½ Graphical error fixes:
 	- Auction shopping list frame had invisible borders
 
 v2.1.4
-• New features:
+ï¿½ New features:
 	- Reagents, requires for crafting, can now be said not only into SAY channel, but also into YELL, PARTY, GUILD and RAID channels (Thanks to AyrianaWoW from github.com)
 
 v2.1.5
-• Data flow fixes:
+ï¿½ Data flow fixes:
 	- Crafting items required Atlas addon to be present in crafting time request function.
 
-• Control fixes:
+ï¿½ Control fixes:
 	- Closing the addon using Escape button was hiding the profession frame and not closing the profession.
 
 v2.1.6
-• Data flow fixes:
+ï¿½ Data flow fixes:
 	- Profession could appear multiple times while working together with some addons (MasterTradeSkills for example).
 
 v2.1.7
-• New features:
+ï¿½ New features:
 	- Jewelcrafting profession support (but not for specializations yet) for Turtle WoW private server
 
-• Data flow fixes:
+ï¿½ Data flow fixes:
 	- Fix of the error "Blizzard_TradeSkillUI.lua:171: attempt to perform arithmetic on local `skillOffset' (a nil value)" on Turtle WoW private server
 
 v2.1.8
-• New features:
+ï¿½ New features:
 	- AtlasLoot support update: Jewelcrafting and Survival professions show skill-up levels
 	- otravi Cast Bar support: ATSW gives oCB the icon of the current crafting item
-• Graphical changes:
+ï¿½ Graphical changes:
 	- New background for cooking profession
 	- Brighter background for smelting profession
-• Data flow fixes:
+ï¿½ Data flow fixes:
 	- Skill-up levels was showing only for sorting by difficulty
 
 v2.1.9
-• Data flow fixes:
+ï¿½ Data flow fixes:
 	- Auction shopping list was inserting item link instead of item name into Blizzard auction interface
 	- Minor fix
 	- AtlasLoot support: getting data from the new update of AtlasLoot
-• Control fixes:
+ï¿½ Control fixes:
 	- Clicking on a task was not selecting a recipe
-• Graphical changes:
+ï¿½ Graphical changes:
 	- Rank bar have a spark
 
 v2.1.10
-• Data flow fixes:
+ï¿½ Data flow fixes:
 	- Fix of issue #21: failure to open on a new realm after opening successfully on a different realm
 	- AtlasLoot support: skill-ups didn't show if one of them is unknown
 
 v2.1.11
-• Graphical changes:
+ï¿½ Graphical changes:
 	- New icon for Smelting profession
 
 v2.1.12
-• New features:
+ï¿½ New features:
 	- An ability to show Attributes of items instead of their names.
 	- Crafting item tooltip shows information of the item of the craft
-• Data flow fixes:
+ï¿½ Data flow fixes:
 	- Fix of issue #29: The search inside AtlasLoot table did not ensure if the table exists
-• Graphical error fixes:
+ï¿½ Graphical error fixes:
 	- Config window header was becoming white if window mode was changed.
 
 v2.1.13
 - Version has been removed from addon's name
 
-• Data flow fixes:
+ï¿½ Data flow fixes:
 	- Crafting status bar was still showing if the error "You can't carry any more of those items." would appear.
 	- Searching for a reagent in recipes caused error
-• Graphical changes:
+ï¿½ Graphical changes:
 	- Hovering a mouse over a recipe shows a highlight
-• Graphical error fixes:
+ï¿½ Graphical error fixes:
 	- Recipe cooldown was showing doubled
 
 v2.1.14
-• Control fixes:
+ï¿½ Control fixes:
 	- Fix of issue #36: Train button in Beast Training was unselectable
-• Graphical error fixes:
+ï¿½ Graphical error fixes:
 	- Fix of issue #36: Reagents were not hiding after selection of Beast Training
 
 v2.1.15
-• New features:
+ï¿½ New features:
 	- The addon is movable
-• Data flow fixes:
+ï¿½ Data flow fixes:
 	- Fix of issue #41: Clicking on disguise caused an error
-• Graphical changes:
+ï¿½ Graphical changes:
 	- A shadow has been added to profession's background
+v2.1.17
+â—† New features:
+	- The addon window is now movable by dragging
+	- Added Ctrl+Scroll wheel scaling (0.5xâ€“2.0x); scale persists across sessions

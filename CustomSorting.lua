@@ -228,6 +228,12 @@ function ATSWCS_OnLoad()
 		local Color = ATSWTypeColor['header']
 		ATSWCSHighlightTexture:SetVertexColor(Color.R, Color.G, Color.B, 0.8)
 	end
+
+	ATSWCSFrame:SetMovable(true)
+	ATSWCSFrame:EnableMouse(true)
+	ATSWCSFrame:RegisterForDrag('LeftButton')
+	ATSWCSFrame:SetScript('OnDragStart', function() this:StartMoving() end)
+	ATSWCSFrame:SetScript('OnDragStop', function() this:StopMovingOrSizing() end)
 end
 
 function ATSWCS_OnShow()
