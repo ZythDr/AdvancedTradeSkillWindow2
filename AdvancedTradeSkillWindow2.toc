@@ -1,13 +1,13 @@
 ## Interface: 11200
 ## Title: Advanced Trade Skill Window 2
 ## Notes: Improved window for your professions for World of Warcraft vanilla
-## Version: 2.1.17
+## Author: Shellyoung, ZythDr (fork)
+## Version: 2.1.16 (1.18.1 fixes)
 ## SavedVariables: ATSW_Characters, ATSW_Profession, ATSW_SelectedRecipe, ATSW_SortBy, ATSW_SearchString, ATSW_SubClassFilter, ATSW_InvSlotFilter, ATSW_ScrollOffset, ATSW_PreviousRecipes, ATSW_Tasks, ATSW_TimeCost, ATSW_NecessaryReagents, ATSW_ContractedCategories, ATSW_Amount, ATSW_Bags, ATSW_Bank, ATSW_Merchant, ATSW_Options, ATSW_CustomCategories, ATSW_CSOpenCategory, ATSW_CSSelected, ATSW_Attributes, ATSW_Debug
 
-## X-ReleaseDate: $Date: 01/02/2026 $
-## X-Email: shellyoung@protonmail.com
+## X-ReleaseDate: $Date: 2026/03/23 $
 ## X-Category: Tradeskill
-## X-Website: https://github.com/Shellyoung/AdvancedTradeSkillWindow2
+## X-Website: https://github.com/ZythDr/AdvancedTradeSkillWindow2
 
 Localization.lua
 AdvancedTradeSkillWindow2.lua
